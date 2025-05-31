@@ -3,10 +3,12 @@ package com.example.gateway.config;
 
 import com.example.gateway.models.CreditScore;
 import com.example.gateway.models.User;
+import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import reactor.core.publisher.Mono;
 
 @Configuration
 public class GatewayConfig {
@@ -33,5 +35,10 @@ public class GatewayConfig {
                         .uri("http://localhost:6464"))
                 .build();
     }
+
+//    @Bean
+//    public KeyResolver ipKeyResolver() {
+//        return exchange -> Mono.just(exchange.getRequest().getRemoteAddress().getAddress().getHostAddress());
+//    }
 }
 

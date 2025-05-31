@@ -24,12 +24,12 @@ public class WebClientConfig {
 //                .build();
 //    }
 
-    @Configuration
-    public class TempRestClientConfig {
-
-        @Bean
-        public RestClient.Builder restClientBuilder() {
-            return RestClient.builder();
-        }
-    }
+//    @Configuration
+//    public class TempRestClientConfig {
+//
+//        @Bean
+//        public RestClient.Builder restClientBuilder() {
+//            return RestClient.builder();
+//        }
+//    }
 }
