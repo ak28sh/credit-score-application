@@ -14,7 +14,7 @@ public class UserManagementClient {
     private WebClient webClient;
 
     //URL endpoint for user-management-service
-    private final String USER_SERVICE_URL = "http://localhost:8081/users";
+    private final String USER_SERVICE_URL = "http://localhost:8082/users";
 
     //Retrieve user details from user management service using reactive web client
     public Mono<String> getuserDetails(int userId) {

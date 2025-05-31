@@ -10,6 +10,7 @@ import com.user.user.response.AuthResponse;
 import com.user.user.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -35,7 +36,7 @@ public class UserController {
     private UserService userService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> registerUser(@RequestBody User user) throws Exception {
+    public ResponseEntity<AuthResponse> registerUser(@Valid @RequestBody User user) throws Exception {
 
         User userExists = userRepository.findByEmail(user.getEmail());
 
