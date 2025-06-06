@@ -14,6 +14,7 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -80,6 +81,7 @@ public class CreditScoreService {
         return convertToDTO(creditScore);
     }
 
+    @Async("customExecutor")
     public CreditScoreDTO getCreditScoreByEmailId(int userId) {
         //Synchronous call to get user details
         String userDetails = userManagementClient.getuserDetails(userId).block();  //Synchronous call to get user details
