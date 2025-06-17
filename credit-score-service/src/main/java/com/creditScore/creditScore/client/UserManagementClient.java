@@ -1,5 +1,6 @@
 package com.creditScore.creditScore.client;
 
+import com.creditScore.creditScore.config.JwtConstant;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -22,7 +23,8 @@ public class UserManagementClient {
         //Create an HTTP get Request
         return webClient.get()
                 .uri(USER_SERVICE_URL + "/{userId}", userId)
-                .header("Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY3ODUyNjcsImV4cCI6MTczNjg3MTY2NywiZW1haWwiOiJ0b21AZ21haWwuY29tIn0.rtK6IM3zzNxEkrsC-cLNwZ61EsbcZcJSOnazvv7rg-SQ5DnUf73CQ9xLgsd_RAxalwGdUW7MFRU16fmtqKvd3A")
+                //Please generalize this token
+                .header(JwtConstant.WEB_CLIENT_TOKEN)
                 .retrieve() //Extract response body automatically
                 .bodyToMono(String.class); //convert response body to Mono that emits strings
     }
