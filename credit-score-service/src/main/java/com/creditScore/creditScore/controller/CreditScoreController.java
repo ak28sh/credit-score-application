@@ -6,6 +6,8 @@ import com.creditScore.creditScore.dto.ScoreHistoryDTO;
 import com.creditScore.creditScore.request.AddCreditScoreRequest;
 import com.creditScore.creditScore.service.CreditScoreService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,10 +32,13 @@ public class CreditScoreController {
     }
 
     @GetMapping("/{userId}")
-    public CreditScoreDTO getCreditScore(@PathVariable int userId) {
-        System.out.print("Hello");
-        System.out.print(userId);
-        return creditScoreService.getCreditScoreByEmailId(userId);
+    public ResponseEntity<?> getCreditScore(@PathVariable int userId) {
+
+        CreditScoreDTO creditScoreDTO = creditScoreService.getCreditScoreByEmailId(userId);
+        if(creditScoreDTO == null){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Credit Score not found");
+        }
+        return ResponseEntity.ok(creditScoreDTO);
     }
 
     @PostMapping("/update/{userId}")

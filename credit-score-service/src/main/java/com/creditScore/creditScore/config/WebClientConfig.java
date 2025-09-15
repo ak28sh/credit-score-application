@@ -13,3 +13,8 @@ public class WebClientConfig {
     }
 
 }
+
+
+
+//Creating instance of web client and returning it
+//This bean can be used

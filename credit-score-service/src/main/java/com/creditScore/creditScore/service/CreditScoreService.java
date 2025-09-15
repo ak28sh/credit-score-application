@@ -40,6 +40,9 @@ public class CreditScoreService {
     @Autowired
     private KafkaTemplate<String, Object> kafkaTemplate;
 
+    @Autowired
+    private EmailService emailService;
+
     //Create logger for this class
     private static final Logger logger = LogManager.getLogger(CreditScoreService.class);
     private static final String CREDIT_SCORE_UPDATE = "credit-score-update";
@@ -61,6 +64,29 @@ public class CreditScoreService {
         }
     }
 
+    public String getEmailFromUserId(int userId) {
+        //Synchronous call to get user details
+        String userDetails = userManagementClient.getuserDetails(userId).block();  //Synchronous call to get user details
+        System.out.print(userDetails);
+        if (userDetails == null || userDetails.isEmpty()) {
+            logger.info("User details not found for userId: {}", userId);
+            return null;
+        }
+        return extractEmailFromJson(userDetails);
+    }
+
+
+
+    /*
+    * Function takes userId and AddCreditScoreRequest as input
+    * Create a new CreditScore entity and set its properties
+    * Save the CreditScore entity to the database using creditScoreRepository
+
+    * Retrieve user details using userManagementClient
+    * Extract email from user details JSON
+    * Store the CreditScore entity in Redis cache with email as key
+    * Return the saved CreditScore entity converted to CreditScoreDTO
+    */
     public CreditScoreDTO addCreditScoreByUserId(int userId, AddCreditScoreRequest addCreditScoreRequest) {
         CreditScore creditScore = new CreditScore();
         creditScore.setUserId(userId);
@@ -69,39 +95,70 @@ public class CreditScoreService {
         creditScore.setLast_updated(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         creditScoreRepository.save(creditScore);
 
-        String userDetails = userManagementClient.getuserDetails(userId).block();  //Synchronous call to get user details
-        String emailId = extractEmailFromJson(userDetails);
-        System.out.print(userDetails);
-        System.out.print(emailId);
+        String emailId = getEmailFromUserId(userId);
 
-        if (emailId != null && !emailId.isEmpty())
+        if (emailId != null && !emailId.isEmpty()) {
+            logger.info("Retrieved emailId: {} for userId: {}", emailId, userId);
             redisTemplate.opsForValue().set(emailId, creditScore);
+            logger.info("Credit score cached in Redis for emailId: {}", emailId);
+            emailService.sendEmail(emailId, "Credit Score Added", "Dear Customer, Your new credit score is: " + creditScore.getScore());
+        }
         else
             System.out.print("Empty email address");
         return convertToDTO(creditScore);
     }
 
+    /*
+    * Function takes userId as input
+    * Get user details using userManagementClient
+    * Extract email from user details JSON
+    * Check Redis cache for CreditScore using email as keys
+    * If not found in cache, retrieve from database
+    * Send credit score update to Kafka topic
+    * Return the CreditScore entity converted to CreditScoreDTO
+    */
+
     @Async("customExecutor")
     public CreditScoreDTO getCreditScoreByEmailId(int userId) {
+
+        System.out.println("Processing credit score request for user id " + userId + " in thread " + Thread.currentThread().getName());
+
         //Synchronous call to get user details
         String userDetails = userManagementClient.getuserDetails(userId).block();  //Synchronous call to get user details
-        String emailId = extractEmailFromJson(userDetails);
         System.out.print(userDetails);
-        System.out.print(emailId);
-        if(emailId == null){
-            logger.info("Unable to find emailId");
+        if (userDetails == null || userDetails.isEmpty()) {
+            logger.info("User details not found for userId: {}", userId);
+            return null;
         }
+
+        String emailId = extractEmailFromJson(userDetails);
+        System.out.print(emailId);
+        if (emailId == null || emailId.isEmpty()) {
+            logger.info("Email ID not found in user details for userId: {}", userId);
+            return null;
+        }
+
         CreditScore creditScore = (CreditScore) redisTemplate.opsForValue().get(emailId); //Synchronus call to gte user details
         //If credit score not in redis cache
         if(creditScore == null){
-            logger.info("Fetching from DB");
+            logger.info("Credit score not found in Redis for emailId: {}. Fetching from DB.", emailId);
             creditScore = creditScoreRepository.findTopByUserIdOrderByDateDesc(userId);
+            if(creditScore == null){
+                logger.info("Credit score not found in DB for userId: {}", userId);
+                return null;
+            }
         } else {
-            logger.info("Fetching from redis");
+            logger.info("Credit score retrieved from Redis for emailId: {}", emailId);
         }
         sendToKafka(creditScore.getScore(), emailId);
         return convertToDTO(creditScore);
     }
+
+    /*
+    Function takes creditScore and emailId as input
+    Create a NotificationDTO message with creditScore and emailId
+    Send the message to Kafka topic CREDIT_SCORE_UPDATE using kafkaTemplate
+    * */
 
     //Send credit score update to kafka topic
     private void sendToKafka(int creditScore, String emailId) {
@@ -109,12 +166,28 @@ public class CreditScoreService {
         kafkaTemplate.send(CREDIT_SCORE_UPDATE, message);
     }
 
+    /*
+    * Function takes userId as input
+    * Find lastest credit score for userId from database
+    * Convert the CreditScore entity to CreditScoreDTO
+    * Return the CreditScoreDTO
+    * */
+
     //get credit score for user id from database
     public CreditScoreDTO getCreditScoreByUserId(int userId) {
-        String emailId = userManagementClient.getuserDetails(userId).block();  //Synchronous call to get user details
+        //String emailId = userManagementClient.getuserDetails(userId).block();  //Synchronous call to get user details
         CreditScore creditScore = creditScoreRepository.findTopByUserIdOrderByDateDesc(userId);
         return convertToDTO(creditScore);
     }
+
+    /*
+    * Function takes userId and AddCreditScoreRequest as input
+    * Find latest credit score for userId from database
+    * Update the score and date properties of the CreditScore entity
+    * Save the updated CreditScore entity to the database
+    * Convert the updated CreditScore entity to CreditScoreDTO
+    * Return the CreditScoreDTO
+    * */
 
     //update credit score in database
     public CreditScoreDTO updateCreditScore(int userId, AddCreditScoreRequest addCreditScoreRequest) {
@@ -125,14 +198,32 @@ public class CreditScoreService {
         existingScore.setScore(addCreditScoreRequest.getScore());
         existingScore.setDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         existingScore = creditScoreRepository.save(existingScore);
+        String emailId = getEmailFromUserId(userId);
+        redisTemplate.opsForValue().set(emailId, existingScore);
         return convertToDTO(existingScore);
     }
+
+    /*
+    * Function takes userId as input
+    * Find latest credit score for userId from database
+    * Delete the CreditScore entity from the database
+    * Return void
+    * */
 
     //Delete credit score by user id
     public void deleteCreditScoreByUserId(int userId) {
         CreditScore latestCreditScore = creditScoreRepository.findTopByUserIdOrderByDateDesc(userId);
         creditScoreRepository.delete(latestCreditScore);
     }
+
+    /*
+    * Function takes userId as input
+    * Find all credit scores for userId from database
+    * Group the CreditScore entities by userId
+    * Transform each CreditScore entity to ScoreDTO using convertToScoreDTO method
+    * Create a ScoreHistoryDTO for each userId with the list of ScoreDTOs
+    * Collect all ScoreHistoryDTOs into a list and return it
+    * */
 
     //Retrieve credit score history for a user transforming each score into detailed DTO
     public List<ScoreHistoryDTO> getCreditScoreHistoryByUserId(int userId) {
@@ -147,6 +238,8 @@ public class CreditScoreService {
                                 .collect(Collectors.toList())))
                 .collect(Collectors.toList());
     }
+
+
 
     //Convert credit score to score dto
     public ScoreDTO convertToScoreDTO(CreditScore creditScore) {
